@@ -79,6 +79,8 @@ You must implement:
 ```c
 int read_exact(int fd, void *buf, size_t n);
 int write_exact(int fd, const void *buf, size_t n);
+size_t recv_exact(int fd, void *buf, size_t len);
+size_t send_all(int fd, const void *buf, size_t len);
 ```
 
 Handle partial reads/writes.
