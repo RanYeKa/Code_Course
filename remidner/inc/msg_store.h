@@ -52,5 +52,10 @@ storage_status_t msg_storage_get_status(const msg_storage_t* msg_storage);
 time_t msg_storage_get_head_time(const msg_storage_t* msg_storage);
 time_t msg_storage_get_tail_time(const msg_storage_t* msg_storage);
 
+// boolean operations
+bool msg_storage_is_full(const msg_storage_t* msg_storage);
+bool msg_storage_is_empty(const msg_storage_t* msg_storage);
+
+
 // presentation functions
 void msg_storage_print(const msg_storage_t* msg_storage, msg_print_func print_func);

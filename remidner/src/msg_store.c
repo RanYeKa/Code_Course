@@ -1,6 +1,21 @@
 #include "proto.h"
 #include "msg_store.h"
 
+#include <stdio.h>
+
+// Helper functions
+static void increase_storage_index(size_t *curr_idx, size_t capacity){
+    *curr_idx = (*curr_idx + 1) % capacity;
+}
+
+static void decrease_storage_index(size_t *curr_idx, size_t capacity){
+    *curr_idx = (*curr_idx - 1) % capacity;
+}
+
+static size_t cap_modulo(size_t a, size_t b, size_t capacity){
+    return (a % b) % capacity;
+}
+
 
 // creation and deletion and health check
 storage_status_t msg_storage_init(msg_storage_t* msg_storage, size_t capacity){
@@ -26,6 +41,10 @@ storage_status_t msg_storage_init(msg_storage_t* msg_storage, size_t capacity){
 }
 
 storage_status_t msg_storage_health_check(msg_storage_t* msg_storage){
+    if (!msg_storage){
+        printf("Error: Invalid parameter for msg_storage_health_check\n");
+        return STORAGE_ERROR;
+    }
     bool test = true;
     test &= (msg_storage->status != STORAGE_ERROR);
     test &= (msg_storage->storage != NULL);
@@ -70,8 +89,98 @@ void msg_storage_delete(msg_storage_t* msg_storage){
 }
 
 // operations
-storage_operation_status_t msg_storage_push(msg_storage_t* msg_storage, const sensor_msg_t* msg);  // TODO
-storage_operation_status_t msg_storage_pop(msg_storage_t* msg_storage, sensor_msg_t* msg);  // TODO
+storage_operation_status_t msg_storage_push(msg_storage_t* msg_storage, const sensor_msg_t* msg){
+    if(!msg_storage){
+        printf("Error: Invalid parameter for msg_storage_push\n");
+        return OPERATION_FAILURE;
+    }
+
+    if(!msg){
+        printf("Error: Invalid message parameter for msg_storage_push\n");
+        return OPERATION_FAILURE;
+    }
+
+    if(msg_storage->status == STORAGE_ERROR){
+        printf("Error: Storage is in an error state for msg_storage_push\n");
+        return OPERATION_FAILURE;
+    }
+
+    size_t temp_tail = cap_modulo(msg_storage->tail, 1, msg_storage->capacity);
+    if(msg_storage->head == -1 && msg_storage->tail == -1){
+        // first push
+        increase_storage_index(&msg_storage->head, msg_storage->capacity); // head moves to 0
+        increase_storage_index(&msg_storage->tail, msg_storage->capacity); // tail moves to 0
+        memcpy( &msg_storage->storage[msg_storage->tail].sensor_msg,
+                msg,
+                sizeof(typeof(msg_storage->storage[msg_storage->tail].sensor_msg))
+            );
+        msg_storage->storage[msg_storage->tail].storage_time = time(NULL); // Set the storage time to the current time
+    }
+    else if(temp_tail == msg_storage->head){
+        // full circle - overwrite oldest message
+        increase_storage_index(&msg_storage->tail, msg_storage->capacity);
+        increase_storage_index(&msg_storage->head, msg_storage->capacity);
+        memcpy( &msg_storage->storage[msg_storage->tail].sensor_msg,
+                msg,
+                sizeof(typeof(msg_storage->storage[msg_storage->tail].sensor_msg))
+            );
+        msg_storage->storage[msg_storage->tail].storage_time = time(NULL); // Set the storage time to the current time
+    }
+    else{
+        // simple push
+        increase_storage_index(&msg_storage->tail, msg_storage->capacity);
+        memcpy( &msg_storage->storage[msg_storage->tail].sensor_msg,
+                msg,
+                sizeof(typeof(msg_storage->storage[msg_storage->tail].sensor_msg))
+            );
+    }
+
+    // some statistics update
+    msg_storage->count++;
+    msg_storage->total_pushed++;
+    return OPERATION_SUCCESS;
+}
+
+storage_operation_status_t msg_storage_pop(msg_storage_t* msg_storage, sensor_msg_t* msg){
+    if(!msg_storage){
+        printf("Error: Invalid parameter for msg_storage_push\n");
+        return OPERATION_FAILURE;
+    }
+
+    if(!msg){
+        printf("Error: Invalid message parameter for msg_storage_push\n");
+        return OPERATION_FAILURE;
+    }
+
+    if(msg_storage->status == STORAGE_ERROR){
+        printf("Error: Storage is in an error state for msg_storage_push\n");
+        return OPERATION_FAILURE;
+    }
+
+    if(msg_storage_is_empty(msg_storage)){
+        printf("Error: Storage is empty, cannot pop message\n");
+        return OPERATION_FAILURE;
+    }
+
+    memcpy( msg,
+            &msg_storage->storage[msg_storage->tail].sensor_msg,
+            sizeof(typeof(msg_storage->storage[msg_storage->tail].sensor_msg))
+    );
+
+    // only special case: tail == head --> empty status.
+    if(msg_storage->tail == msg_storage->head){
+        msg_storage->status = STORAGE_EMPTY;
+        // reset head & tail
+        msg_storage->head = -1;
+        msg_storage->tail = -1;
+    }
+
+    // some statistics update
+    msg_storage->count--;
+    msg_storage->total_popped++;
+    return OPERATION_SUCCESS;
+
+}
 
 // boolean operations
 bool msg_storage_is_full(const msg_storage_t* msg_storage){
