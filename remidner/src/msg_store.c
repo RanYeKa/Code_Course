@@ -26,8 +26,8 @@ storage_status_t msg_storage_init(msg_storage_t* msg_storage, size_t capacity){
     }
     msg_storage->capacity = capacity;
     msg_storage->count = 0;
-    msg_storage->head = -1; // Using -1 to indicate that the storage is initially empty and there is no valid head index
-    msg_storage->tail = -1; // Using -1 to indicate that the storage is initially empty and there is no valid tail index
+    msg_storage->head = INVALID_SIZE; // Using INVALID_SIZE to indicate that the storage is initially empty and there is no valid head index
+    msg_storage->tail = INVALID_SIZE; // Using INVALID_SIZE to indicate that the storage is initially empty and there is no valid tail index
     msg_storage->total_pushed = 0;
     msg_storage->total_popped = 0;
     msg_storage->status = STORAGE_OK;
@@ -59,8 +59,8 @@ void msg_storage_cleanup(msg_storage_t* msg_storage){
     }
     // reinitialize the storage to reset all fields and clear the stored messages
     msg_storage->count = 0;
-    msg_storage->head = -1; // Using -1 to indicate that the storage is initially empty and there is no valid head index
-    msg_storage->tail = -1; // Using -1 to indicate that the storage is initially empty and there is no valid tail index
+    msg_storage->head = INVALID_SIZE; // Using INVALID_SIZE to indicate that the storage is initially empty and there is no valid head index
+    msg_storage->tail = INVALID_SIZE; // Using INVALID_SIZE to indicate that the storage is initially empty and there is no valid tail index
     msg_storage->total_pushed = 0;
     msg_storage->total_popped = 0;
     msg_storage->status = STORAGE_EMPTY;
@@ -76,11 +76,11 @@ void msg_storage_cleanup(msg_storage_t* msg_storage){
 
 void msg_storage_delete(msg_storage_t* msg_storage){
     if (!msg_storage) return;
-    msg_storage->count = -1;
-    msg_storage->head = -1;
-    msg_storage->tail = -1;
-    msg_storage->total_pushed = -1;
-    msg_storage->total_popped = -1;
+    msg_storage->count = INVALID_SIZE;
+    msg_storage->head = INVALID_SIZE;
+    msg_storage->tail = INVALID_SIZE;
+    msg_storage->total_pushed = INVALID_SIZE;
+    msg_storage->total_popped = INVALID_SIZE;
     msg_storage->status = STORAGE_ERROR;
 
     if (!msg_storage->storage) return;
@@ -106,7 +106,7 @@ storage_operation_status_t msg_storage_push(msg_storage_t* msg_storage, const se
     }
 
     size_t temp_tail = cap_modulo(msg_storage->tail, 1, msg_storage->capacity);
-    if(msg_storage->head == -1 && msg_storage->tail == -1){
+    if(msg_storage->head == INVALID_SIZE && msg_storage->tail == INVALID_SIZE){
         // first push
         increase_storage_index(&msg_storage->head, msg_storage->capacity); // head moves to 0
         increase_storage_index(&msg_storage->tail, msg_storage->capacity); // tail moves to 0
@@ -167,15 +167,19 @@ storage_operation_status_t msg_storage_pop(msg_storage_t* msg_storage, sensor_ms
             sizeof(typeof(msg_storage->storage[msg_storage->tail].sensor_msg))
     );
 
-    // only special case: tail == head --> empty status.
+    // the only special case for popping: tail == head --> empty status.
     if(msg_storage->tail == msg_storage->head){
+        // update status
         msg_storage->status = STORAGE_EMPTY;
         // reset head & tail
-        msg_storage->head = -1;
-        msg_storage->tail = -1;
+        msg_storage->head = INVALID_SIZE;
+        msg_storage->tail = INVALID_SIZE;
+    }else{
+        // normal pop - just move the tail back by one position to point to the next message to pop
+        decrease_storage_index(&msg_storage->tail, msg_storage->capacity);
     }
 
-    // some statistics update
+    //
     msg_storage->count--;
     msg_storage->total_popped++;
     return OPERATION_SUCCESS;
@@ -200,27 +204,27 @@ bool msg_storage_is_empty(const msg_storage_t* msg_storage){
 // getters
 size_t msg_storage_get_count(const msg_storage_t* msg_storage){
     if (!msg_storage){
-        return -1;
+        return INVALID_SIZE;
     }
     return msg_storage->count;
 }
 
 size_t msg_storage_get_capacity(const msg_storage_t* msg_storage){
     if (!msg_storage){
-        return -1;
+        return INVALID_SIZE;
     }
     return msg_storage->capacity;
 }
 
 unsigned long msg_storage_get_total_pushed(const msg_storage_t* msg_storage){
     if (!msg_storage){
-        return -1;
+        return INVALID_SIZE;
     }
     return msg_storage->total_pushed;
 }
 unsigned long msg_storage_get_total_popped(const msg_storage_t* msg_storage){
     if (!msg_storage){
-        return -1;
+        return INVALID_SIZE;
     }
     return msg_storage->total_popped;
 }
@@ -234,14 +238,14 @@ storage_status_t msg_storage_get_status(const msg_storage_t* msg_storage){
 
 time_t msg_storage_get_head_time(const msg_storage_t* msg_storage){
     if (!msg_storage || msg_storage->count == 0){
-        return -1;
+        return INVALID_SIZE;
     }
     return msg_storage->storage[msg_storage->head].storage_time;
 }
 
 time_t msg_storage_get_tail_time(const msg_storage_t* msg_storage){
     if (!msg_storage || msg_storage->count == 0){
-        return -1;
+        return INVALID_SIZE;
     }
     return msg_storage->storage[msg_storage->tail].storage_time;
 }

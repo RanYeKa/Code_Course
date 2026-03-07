@@ -1,6 +1,7 @@
 #pragma once
 #include "proto.h"
 
+#define INVALID_SIZE 0xFFFFFFFF
 
 typedef void (*msg_print_func)(const void *msg);
 
