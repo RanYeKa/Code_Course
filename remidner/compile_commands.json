@@ -6,67 +6,11 @@
       "-Iinc",
       "-c",
       "-o",
-      "main.o",
-      "main.c"
-    ],
-    "directory": "/home/ranyeh/EmbeddedCenter/Code_Course/remidner",
-    "file": "/home/ranyeh/EmbeddedCenter/Code_Course/remidner/main.c",
-    "output": "/home/ranyeh/EmbeddedCenter/Code_Course/remidner/main.o"
-  },
-  {
-    "arguments": [
-      "/usr/bin/gcc",
-      "-Wall",
-      "-Iinc",
-      "-c",
-      "-o",
-      "src/loops.o",
-      "src/loops.c"
-    ],
-    "directory": "/home/ranyeh/EmbeddedCenter/Code_Course/remidner",
-    "file": "/home/ranyeh/EmbeddedCenter/Code_Course/remidner/src/loops.c",
-    "output": "/home/ranyeh/EmbeddedCenter/Code_Course/remidner/src/loops.o"
-  },
-  {
-    "arguments": [
-      "/usr/bin/gcc",
-      "-Wall",
-      "-Iinc",
-      "-c",
-      "-o",
       "src/msg_store.o",
       "src/msg_store.c"
     ],
     "directory": "/home/ranyeh/EmbeddedCenter/Code_Course/remidner",
     "file": "/home/ranyeh/EmbeddedCenter/Code_Course/remidner/src/msg_store.c",
     "output": "/home/ranyeh/EmbeddedCenter/Code_Course/remidner/src/msg_store.o"
-  },
-  {
-    "arguments": [
-      "/usr/bin/gcc",
-      "-Wall",
-      "-Iinc",
-      "-c",
-      "-o",
-      "src/reminder.o",
-      "src/reminder.c"
-    ],
-    "directory": "/home/ranyeh/EmbeddedCenter/Code_Course/remidner",
-    "file": "/home/ranyeh/EmbeddedCenter/Code_Course/remidner/src/reminder.c",
-    "output": "/home/ranyeh/EmbeddedCenter/Code_Course/remidner/src/reminder.o"
-  },
-  {
-    "arguments": [
-      "/usr/bin/gcc",
-      "-Wall",
-      "-Iinc",
-      "-c",
-      "-o",
-      "src/sensor.o",
-      "src/sensor.c"
-    ],
-    "directory": "/home/ranyeh/EmbeddedCenter/Code_Course/remidner",
-    "file": "/home/ranyeh/EmbeddedCenter/Code_Course/remidner/src/sensor.c",
-    "output": "/home/ranyeh/EmbeddedCenter/Code_Course/remidner/src/sensor.o"
   }
 ]

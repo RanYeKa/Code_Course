@@ -26,3 +26,7 @@ dist/
 
 # Specific Files
 main_app
+.clangd
+compile_commands.json
+sensorhub/compile_commands.json
+remidner/compile_commands.json
