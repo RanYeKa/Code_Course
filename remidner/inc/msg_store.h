@@ -1,4 +1,8 @@
 #pragma once
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "proto.h"
 
 #define INVALID_SIZE 0xFFFFFFFF
