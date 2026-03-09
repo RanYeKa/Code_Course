@@ -1,3 +1,5 @@
+# file name and root related path: sensorhub/Makefile
+
 CC = gcc
 CFLAGS = -Wall -Iinc
 SRC = main.c $(wildcard src/*.c)

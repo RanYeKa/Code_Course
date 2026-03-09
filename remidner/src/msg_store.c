@@ -9,11 +9,13 @@ static void increase_storage_index(size_t *curr_idx, size_t capacity){
 }
 
 static void decrease_storage_index(size_t *curr_idx, size_t capacity){
-    *curr_idx = (*curr_idx - 1) % capacity;
+    printf("Decreasing index from %zu ", *curr_idx);
+    *curr_idx = (*curr_idx - 1 + capacity) % capacity; // Adding capacity before modulo to handle negative values correctly
+    printf("to %zu\n", *curr_idx);
 }
 
 static size_t cap_modulo(size_t a, size_t b, size_t capacity){
-    return (a % b) % capacity;
+    return (a + b) % capacity;
 }
 
 
@@ -106,25 +108,27 @@ storage_operation_status_t msg_storage_push(msg_storage_t* msg_storage, const se
     }
 
     size_t temp_tail = cap_modulo(msg_storage->tail, 1, msg_storage->capacity);
+    bool isOverwrite = false;
+
     if(msg_storage->head == INVALID_SIZE && msg_storage->tail == INVALID_SIZE){
         // first push
-        increase_storage_index(&msg_storage->head, msg_storage->capacity); // head moves to 0
-        increase_storage_index(&msg_storage->tail, msg_storage->capacity); // tail moves to 0
+        msg_storage->head = 0;
+        msg_storage->tail = 0;
         memcpy( &msg_storage->storage[msg_storage->tail].sensor_msg,
                 msg,
                 sizeof(typeof(msg_storage->storage[msg_storage->tail].sensor_msg))
             );
-        msg_storage->storage[msg_storage->tail].storage_time = time(NULL); // Set the storage time to the current time
     }
     else if(temp_tail == msg_storage->head){
         // full circle - overwrite oldest message
+        isOverwrite = true;
+        printf(BOLD_RED"[DBG] Storage is full, overwriting message at index %zu\n"RESET, msg_storage->tail);
         increase_storage_index(&msg_storage->tail, msg_storage->capacity);
         increase_storage_index(&msg_storage->head, msg_storage->capacity);
         memcpy( &msg_storage->storage[msg_storage->tail].sensor_msg,
                 msg,
                 sizeof(typeof(msg_storage->storage[msg_storage->tail].sensor_msg))
             );
-        msg_storage->storage[msg_storage->tail].storage_time = time(NULL); // Set the storage time to the current time
     }
     else{
         // simple push
@@ -134,26 +138,29 @@ storage_operation_status_t msg_storage_push(msg_storage_t* msg_storage, const se
                 sizeof(typeof(msg_storage->storage[msg_storage->tail].sensor_msg))
             );
     }
-
+    msg_storage->storage[msg_storage->tail].storage_time = time(NULL); // Set the storage time to the current time
     // some statistics update
-    msg_storage->count++;
+    msg_storage->count = (isOverwrite)? msg_storage->capacity : (msg_storage->count + 1);
     msg_storage->total_pushed++;
+
+    printf(BOLD_RED"[DBG] pushed message to TAIL %zu\n"RESET, msg_storage->tail);
+    printf(BOLD_RED"[DBG] Head Index: %zu\n"RESET, msg_storage->head);
     return OPERATION_SUCCESS;
 }
 
 storage_operation_status_t msg_storage_pop(msg_storage_t* msg_storage, sensor_msg_t* msg){
     if(!msg_storage){
-        printf("Error: Invalid parameter for msg_storage_push\n");
+        printf("Error: Invalid parameter for msg_storage_pop\n");
         return OPERATION_FAILURE;
     }
 
     if(!msg){
-        printf("Error: Invalid message parameter for msg_storage_push\n");
+        printf("Error: Invalid message parameter for msg_storage_pop\n");
         return OPERATION_FAILURE;
     }
 
     if(msg_storage->status == STORAGE_ERROR){
-        printf("Error: Storage is in an error state for msg_storage_push\n");
+        printf("Error: Storage is in an error state for msg_storage_pop\n");
         return OPERATION_FAILURE;
     }
 
@@ -162,6 +169,7 @@ storage_operation_status_t msg_storage_pop(msg_storage_t* msg_storage, sensor_ms
         return OPERATION_FAILURE;
     }
 
+    printf(BOLD_RED"[DBG] popping message from index %zu\n"RESET, msg_storage->tail);
     memcpy( msg,
             &msg_storage->storage[msg_storage->tail].sensor_msg,
             sizeof(typeof(msg_storage->storage[msg_storage->tail].sensor_msg))
@@ -182,6 +190,8 @@ storage_operation_status_t msg_storage_pop(msg_storage_t* msg_storage, sensor_ms
     //
     msg_storage->count--;
     msg_storage->total_popped++;
+    printf(BOLD_RED"[DBG] popped message from index %zu\n"RESET, msg_storage->tail);
+    printf(BOLD_RED"[DBG] Head Index: %zu\n"RESET, msg_storage->head);
     return OPERATION_SUCCESS;
 
 }
@@ -263,6 +273,8 @@ void msg_storage_print(const msg_storage_t* msg_storage, msg_print_func print_fu
     printf("Current Count: %zu\n", msg_storage->count);
     printf("Total Pushed: %lu\n", msg_storage->total_pushed);
     printf("Total Popped: %lu\n", msg_storage->total_popped);
+    printf(BOLD_RED "Head Index: %zu\n" RESET, msg_storage->head);
+    printf(BOLD_RED "Tail Index: %zu\n" RESET, msg_storage->tail);
 
     // print storage snapshot
     printf("Storage Snapshot:\n");
