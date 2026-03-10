@@ -137,6 +137,10 @@ int* grow_array(int *arr, size_t old_size, size_t new_size){
         return NULL;
     }
 
+    if (old_size == 0){
+        return NULL;
+    }
+
     int* ans = NULL;
     ans = realloc(arr, new_size*sizeof(int));
     if(ans == NULL){
@@ -144,7 +148,12 @@ int* grow_array(int *arr, size_t old_size, size_t new_size){
         return NULL;
     }
 
-    memset(ans+old_size, 0, (new_size-old_size)*sizeof(int));
+    size_t size_diff = (new_size > old_size)? new_size - old_size : 0;
+    if(size_diff){
+        // Enter here only if new_size > old_size, so we need to initialize the new elements to 0
+        memset(ans+old_size, 0, (size_diff)*sizeof(int));
+    }
+
     return ans;
 }
 
@@ -173,6 +182,7 @@ always null terminate
 returns length of src
 */
 size_t safe_str_copy(char *dst, size_t dst_size, const char *src){
+    if(dst_size == 0) return NULL;
     if(src == NULL){
         printf("NULL source string, nothing to copy\n");
         if(dst_size>0){
@@ -195,7 +205,7 @@ size_t safe_str_copy(char *dst, size_t dst_size, const char *src){
         idx++;
     }
     *(dst+idx) = '\0';
-    return idx;
+    return src_size;
 }
 
 
