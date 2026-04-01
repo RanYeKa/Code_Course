@@ -30,3 +30,8 @@ main_app
 compile_commands.json
 sensorhub/compile_commands.json
 remidner/compile_commands.json
+.cache/
+iot_sensor_gateway/.cache/
+archive/sensorhub/.cache/
+archive/remidner/.cache/
+archive/lab/.cache/

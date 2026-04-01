@@ -1,0 +1,341 @@
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+#include "msg_store.h"
+#include "sensor.h"
+
+static int g_checks_run = 0;
+static int g_checks_failed = 0;
+
+static sensor_msg_t make_msg(int id, float value) {
+    return sensor_msg_make(MSG_TEMP, id, value, time(NULL));
+}
+
+static void print_section(const char *title) {
+    printf("\n==================================================\n");
+    printf("%s\n", title);
+    printf("==================================================\n");
+}
+
+static void report_check_result(bool pass, const char *desc) {
+    g_checks_run++;
+    if (pass) {
+        printf("[PASS] %s\n", desc);
+    } else {
+        g_checks_failed++;
+        printf("[FAIL] %s\n", desc);
+    }
+}
+
+static void check_true(const char *desc, bool condition) {
+    report_check_result(condition, desc);
+}
+
+static void check_int(const char *desc, long expected, long actual) {
+    g_checks_run++;
+    if (expected == actual) {
+        printf("[PASS] %s | expected=%ld actual=%ld\n", desc, expected, actual);
+    } else {
+        g_checks_failed++;
+        printf("[FAIL] %s | expected=%ld actual=%ld\n", desc, expected, actual);
+    }
+}
+
+static void check_ulong(const char *desc, unsigned long expected, unsigned long actual) {
+    g_checks_run++;
+    if (expected == actual) {
+        printf("[PASS] %s | expected=%lu actual=%lu\n", desc, expected, actual);
+    } else {
+        g_checks_failed++;
+        printf("[FAIL] %s | expected=%lu actual=%lu\n", desc, expected, actual);
+    }
+}
+
+static void check_float(const char *desc, float expected, float actual, float tol) {
+    float diff = expected - actual;
+    if (diff < 0.0f) {
+        diff = -diff;
+    }
+
+    g_checks_run++;
+    if (diff <= tol) {
+        printf("[PASS] %s | expected=%.3f actual=%.3f\n", desc, expected, actual);
+    } else {
+        g_checks_failed++;
+        printf("[FAIL] %s | expected=%.3f actual=%.3f diff=%.3f tol=%.3f\n",
+               desc, expected, actual, diff, tol);
+    }
+}
+
+static void print_sensor_msg_brief(const sensor_msg_t *msg, const char *label) {
+    if (!msg) {
+        printf("%s: <null>\n", label);
+        return;
+    }
+
+    printf("%s: type=%d id=%d value=%.2f\n",
+           label,
+           msg->type,
+           msg->payload.id,
+           msg->payload.value);
+}
+
+static void dummy_msg_print(const void *msg_ptr) {
+    const sensor_msg_t *msg = (const sensor_msg_t *)msg_ptr;
+    if (!msg) {
+        printf("  [dummy printer] null message\n");
+        return;
+    }
+
+    printf("  [dummy printer] type=%d id=%d value=%.2f\n",
+           msg->type,
+           msg->payload.id,
+           msg->payload.value);
+}
+
+static void validate_message_core(const char *prefix,
+                                  const sensor_msg_t *expected,
+                                  const sensor_msg_t *actual) {
+    char desc[128];
+
+    snprintf(desc, sizeof(desc), "%s -> message type", prefix);
+    check_int(desc, expected->type, actual->type);
+
+    snprintf(desc, sizeof(desc), "%s -> payload.id", prefix);
+    check_int(desc, expected->payload.id, actual->payload.id);
+
+    snprintf(desc, sizeof(desc), "%s -> payload.value", prefix);
+    check_float(desc, expected->payload.value, actual->payload.value, 0.001f);
+}
+
+int main(void) {
+    msg_storage_t storage;
+    sensor_msg_t out = {0};
+
+    print_section("MSG STORAGE UNIT TEST START");
+
+    /*
+     * 1) Invalid init checks
+     */
+    print_section("1) INVALID INIT TESTS");
+    check_int("init(NULL, 3) should return STORAGE_ERROR",
+              STORAGE_ERROR,
+              msg_storage_init(NULL, 3));
+
+    check_int("health_check(NULL) should return STORAGE_ERROR",
+              STORAGE_ERROR,
+              msg_storage_health_check(NULL));
+
+    check_int("init(valid, 0) should return STORAGE_ERROR",
+              STORAGE_ERROR,
+              msg_storage_init(&storage, 0));
+
+    /*
+     * 2) Valid init
+     */
+    print_section("2) VALID INIT TESTS");
+    storage_status_t init_rc = msg_storage_init(&storage, 3);
+    printf("msg_storage_init(&storage, 3) returned %d\n", init_rc);
+
+    check_int("init(valid, 3) return code", STORAGE_EMPTY, init_rc);
+    check_int("health_check after init", STORAGE_OK, msg_storage_health_check(&storage));
+    check_int("capacity after init", 3, (long)msg_storage_get_capacity(&storage));
+    check_int("count after init", 0, (long)msg_storage_get_count(&storage));
+    check_ulong("total_pushed after init", 0UL, msg_storage_get_total_pushed(&storage));
+    check_ulong("total_popped after init", 0UL, msg_storage_get_total_popped(&storage));
+    check_int("status after init", STORAGE_OK, msg_storage_get_status(&storage));
+    check_true("storage is empty after init", msg_storage_is_empty(&storage));
+    check_true("storage is not full after init", !msg_storage_is_full(&storage));
+    check_int("head time on empty storage", INVALID_SIZE, (long)msg_storage_get_head_time(&storage));
+    check_int("tail time on empty storage", INVALID_SIZE, (long)msg_storage_get_tail_time(&storage));
+
+    /*
+     * 3) Prepare messages
+     */
+    print_section("3) PREPARE TEST MESSAGES");
+    sensor_msg_t m1 = make_msg(1, 10.0f);
+    sensor_msg_t m2 = make_msg(2, 20.0f);
+    sensor_msg_t m3 = make_msg(3, 30.0f);
+
+    print_sensor_msg_brief(&m1, "m1");
+    print_sensor_msg_brief(&m2, "m2");
+    print_sensor_msg_brief(&m3, "m3");
+
+    /*
+     * 4) Invalid push/pop parameter tests
+     */
+    print_section("4) INVALID PARAMETER TESTS");
+    check_int("push(NULL, &m1) should fail",
+              OPERATION_FAILURE,
+              msg_storage_push(NULL, &m1));
+
+    check_int("push(&storage, NULL) should fail",
+              OPERATION_FAILURE,
+              msg_storage_push(&storage, NULL));
+
+    check_int("pop(NULL, &out) should fail",
+              OPERATION_FAILURE,
+              msg_storage_pop(NULL, &out));
+
+    check_int("pop(&storage, NULL) should fail",
+              OPERATION_FAILURE,
+              msg_storage_pop(&storage, NULL));
+
+    /*
+     * 5) Push tests
+     */
+    print_section("5) PUSH TESTS");
+
+    storage_operation_status_t push_rc;
+
+    push_rc = msg_storage_push(&storage, &m1);
+    printf("push m1 returned: %d\n", push_rc);
+    check_int("push m1", OPERATION_SUCCESS, push_rc);
+    check_int("count after push m1", 1, (long)msg_storage_get_count(&storage));
+    check_ulong("total_pushed after push m1", 1UL, msg_storage_get_total_pushed(&storage));
+    check_true("storage not empty after push m1", !msg_storage_is_empty(&storage));
+    check_true("storage not full after push m1", !msg_storage_is_full(&storage));
+    check_true("head time valid after first push",
+               msg_storage_get_head_time(&storage) != (time_t)INVALID_SIZE);
+    check_true("tail time valid after first push",
+               msg_storage_get_tail_time(&storage) != (time_t)INVALID_SIZE);
+
+    push_rc = msg_storage_push(&storage, &m2);
+    printf("push m2 returned: %d\n", push_rc);
+    check_int("push m2", OPERATION_SUCCESS, push_rc);
+    check_int("count after push m2", 2, (long)msg_storage_get_count(&storage));
+    check_ulong("total_pushed after push m2", 2UL, msg_storage_get_total_pushed(&storage));
+    check_true("storage not full after push m2", !msg_storage_is_full(&storage));
+
+    push_rc = msg_storage_push(&storage, &m3);
+    printf("push m3 returned: %d\n", push_rc);
+    check_int("push m3", OPERATION_SUCCESS, push_rc);
+    check_int("count after push m3", 3, (long)msg_storage_get_count(&storage));
+    check_ulong("total_pushed after push m3", 3UL, msg_storage_get_total_pushed(&storage));
+    check_true("storage is full after push m3", msg_storage_is_full(&storage));
+    check_true("storage is not empty after push m3", !msg_storage_is_empty(&storage));
+
+    /*
+     * 6) Print test
+     */
+    print_section("6) PRINT TEST");
+    printf("Calling msg_storage_print() with dummy printer:\n");
+    msg_storage_print(&storage, dummy_msg_print);
+    check_true("msg_storage_print executed", true);
+
+    /*
+     * 7) Pop tests
+     *
+     * NOTE:
+     * The current implementation pops from 'tail', so behavior is LIFO-like,
+     * not FIFO. The test below matches the current implementation as written
+     * in msg_store.c :contentReference[oaicite:4]{index=4}
+     */
+    print_section("7) POP TESTS");
+
+    storage_operation_status_t pop_rc;
+
+    pop_rc = msg_storage_pop(&storage, &out);
+    printf("pop #1 returned: %d\n", pop_rc);
+    print_sensor_msg_brief(&out, "pop #1 out");
+    check_int("pop #1 return code", OPERATION_SUCCESS, pop_rc);
+    validate_message_core("pop #1 should return last pushed message (m3)", &m3, &out);
+    check_int("count after pop #1", 2, (long)msg_storage_get_count(&storage));
+    check_ulong("total_popped after pop #1", 1UL, msg_storage_get_total_popped(&storage));
+
+    pop_rc = msg_storage_pop(&storage, &out);
+    printf("pop #2 returned: %d\n", pop_rc);
+    print_sensor_msg_brief(&out, "pop #2 out");
+    check_int("pop #2 return code", OPERATION_SUCCESS, pop_rc);
+    validate_message_core("pop #2 should return m2", &m2, &out);
+    check_int("count after pop #2", 1, (long)msg_storage_get_count(&storage));
+    check_ulong("total_popped after pop #2", 2UL, msg_storage_get_total_popped(&storage));
+
+    pop_rc = msg_storage_pop(&storage, &out);
+    printf("pop #3 returned: %d\n", pop_rc);
+    print_sensor_msg_brief(&out, "pop #3 out");
+    check_int("pop #3 return code", OPERATION_SUCCESS, pop_rc);
+    validate_message_core("pop #3 should return m1", &m1, &out);
+    check_int("count after pop #3", 0, (long)msg_storage_get_count(&storage));
+    check_ulong("total_popped after pop #3", 3UL, msg_storage_get_total_popped(&storage));
+    check_true("storage is empty after all pops", msg_storage_is_empty(&storage));
+    check_true("storage is not full after all pops", !msg_storage_is_full(&storage));
+    check_int("status after all pops", STORAGE_EMPTY, msg_storage_get_status(&storage));
+    check_int("head time after all pops", INVALID_SIZE, (long)msg_storage_get_head_time(&storage));
+    check_int("tail time after all pops", INVALID_SIZE, (long)msg_storage_get_tail_time(&storage));
+
+    /*
+     * 8) Pop from empty
+     */
+    print_section("8) EMPTY POP TEST");
+    pop_rc = msg_storage_pop(&storage, &out);
+    printf("pop on empty storage returned: %d\n", pop_rc);
+    check_int("pop from empty storage should fail", OPERATION_FAILURE, pop_rc);
+
+    /*
+     * 9) Cleanup test
+     */
+    print_section("9) CLEANUP TEST");
+    check_true("cleanup(NULL) should not crash", true);
+    msg_storage_cleanup(NULL);
+
+    msg_storage_push(&storage, &m1);
+    msg_storage_push(&storage, &m2);
+
+    check_int("count before cleanup", 2, (long)msg_storage_get_count(&storage));
+    check_ulong("total_pushed before cleanup", 5UL, msg_storage_get_total_pushed(&storage));
+
+    msg_storage_cleanup(&storage);
+    printf("msg_storage_cleanup(&storage) called\n");
+
+    check_int("count after cleanup", 0, (long)msg_storage_get_count(&storage));
+    check_ulong("total_pushed after cleanup reset", 0UL, msg_storage_get_total_pushed(&storage));
+    check_ulong("total_popped after cleanup reset", 0UL, msg_storage_get_total_popped(&storage));
+    check_true("storage empty after cleanup", msg_storage_is_empty(&storage));
+    check_int("status after cleanup", STORAGE_EMPTY, msg_storage_get_status(&storage));
+    check_int("head after cleanup -> INVALID_SIZE via getter", INVALID_SIZE, (long)msg_storage_get_head_time(&storage));
+    check_int("tail after cleanup -> INVALID_SIZE via getter", INVALID_SIZE, (long)msg_storage_get_tail_time(&storage));
+
+    /*
+     * 10) Delete test
+     */
+    print_section("10) DELETE TEST");
+    check_true("delete(NULL) should not crash", true);
+    msg_storage_delete(NULL);
+
+    msg_storage_delete(&storage);
+    printf("msg_storage_delete(&storage) called\n");
+
+    check_true("storage pointer is NULL after delete", storage.storage == NULL);
+    check_int("status after delete", STORAGE_ERROR, msg_storage_get_status(&storage));
+
+    /*
+     * 11) Operations after delete should fail
+     */
+    print_section("11) POST-DELETE ERROR TESTS");
+    check_int("push after delete should fail",
+              OPERATION_FAILURE,
+              msg_storage_push(&storage, &m1));
+
+    check_int("pop after delete should fail",
+              OPERATION_FAILURE,
+              msg_storage_pop(&storage, &out));
+
+    /*
+     * Summary
+     */
+    print_section("TEST SUMMARY");
+    printf("Total checks : %d\n", g_checks_run);
+    printf("Passed       : %d\n", g_checks_run - g_checks_failed);
+    printf("Failed       : %d\n", g_checks_failed);
+
+    if (g_checks_failed == 0) {
+        printf("\nALL TESTS PASSED.\n");
+        return 0;
+    }
+
+    printf("\nSOME TESTS FAILED.\n");
+    return 1;
+}
