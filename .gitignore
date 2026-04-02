@@ -35,3 +35,4 @@ iot_sensor_gateway/.cache/
 archive/sensorhub/.cache/
 archive/remidner/.cache/
 archive/lab/.cache/
+logs/

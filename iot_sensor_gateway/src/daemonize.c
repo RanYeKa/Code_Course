@@ -18,7 +18,7 @@ pid_t daemonize_process(void) {
     char log_path[256];
     const char* home = getenv("HOME");
     if (home == NULL) exit(EXIT_FAILURE);
-    snprintf(log_path, sizeof(log_path), "%s/temp/log.log", home);
+    snprintf(log_path, sizeof(log_path), "%s/temp/gateway_sys.log", home);
 
     // Re-open with O_TRUNC to "clean" the file immediately
     int fd = open(log_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);

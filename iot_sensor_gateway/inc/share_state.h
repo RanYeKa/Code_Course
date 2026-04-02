@@ -2,7 +2,7 @@
 #pragma once
 
 #include <pthread.h>
-#include <signal.h>
+// #include <signal.h>
 
 #define NUM_OF_SENSORS 4
 #define MAX_SENSOR_NAME_LEN 32

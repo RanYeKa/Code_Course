@@ -5,6 +5,7 @@
 #include <time.h>
 
 #include "ring_buffer.h"
+#include "logger.h"
 
 #define RED   "\033[0;31m"
 #define BLUE  "\033[0;34m"
@@ -53,7 +54,7 @@ OP_STATUS destroy_rbuff(rbuff* rbuff){
 }
 
 OP_STATUS rbuff_write(rbuff* rbuff, sensor_msg* data){
-    printf(BLUE "[DBG] Attempting to write data to ring buffer...\n" RESET);
+    log_info("[DBG] Attempting to write data to ring buffer...");
     if(rbuff == NULL || rbuff->buff == NULL || data == NULL){
         return FAIL;
     }
@@ -82,7 +83,7 @@ OP_STATUS rbuff_write(rbuff* rbuff, sensor_msg* data){
 
 
 OP_STATUS rbuff_read(rbuff* rbuff, sensor_msg* data){
-    printf(RED "[DBG] Attempting to read data from ring buffer...\n" RESET);
+    log_info("[DBG] Attempting to read data from ring buffer...");
     if(rbuff == NULL || rbuff->buff == NULL){
         return FAIL;
     }
@@ -94,11 +95,11 @@ OP_STATUS rbuff_read(rbuff* rbuff, sensor_msg* data){
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += READ_WRITE_TIMEOUT;
-    printf("[DBG] Waiting for data...\n");
+    log_info("[DBG] Waiting for data...");
     int rc = sem_timedwait(&rbuff->sem_items, &ts); // wait for items (decrease items)
-    printf("[DBG] Semwait returned with code %d\n", rc);
+    log_info("[DBG] Semwait returned with code %d", rc);
     if(rc == -1){
-        printf("[ERR - %s] Timeout while waiting for data.\n", __func__);
+        log_err("[ERR - %s] Timeout while waiting for data.", __func__);
         return TIMEOUT;
     }
 
@@ -116,27 +117,30 @@ OP_STATUS rbuff_read(rbuff* rbuff, sensor_msg* data){
 }
 
 bool is_empty(rbuff* rbuff){
-    if(rbuff == NULL) return true; // TODO: what is the correct way to exit here with some code/informative way.
+    if(rbuff == NULL){
+        log_err("Ring buffer is NULL, cannot check if empty.");
+        return false;
+    }
     return (rbuff->read_offset == rbuff->write_offset && rbuff->read_offset == -1);
 }
 
 void print_messages(rbuff* rbuff){
     if(rbuff == NULL) {
         // nothing to print
-        printf("Ring buffer is NULL, nothing to print.\n"); // todo: change to err log later
+        log_err("Ring buffer is NULL, nothing to print.");
         return;
     }
 
     if(is_empty(rbuff) || rbuff->buff==NULL){
         // no data
-        printf("Ring buffer is empty, nothing to print.\n"); // todo: change to err log later
+        log_info("Ring buffer is empty, nothing to print.");
         return;
     }
 
     ssize_t it = rbuff->read_offset;
     pthread_mutex_lock(&rbuff->lock);
     do{
-        printf("massage at [%ld] is [%s] ", it, (rbuff->buff+it)->payload);
+        log_info("Message at [%ld] is [%s] ", it, (rbuff->buff+it)->payload);
         if(it == rbuff->write_offset){
             break;
         }

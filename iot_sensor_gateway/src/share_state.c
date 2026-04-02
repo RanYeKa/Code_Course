@@ -6,10 +6,10 @@
 #include <float.h>
 
 #include "share_state.h"
-
+#include "logger.h"
 
 int init_system_state(system_state* state){
-    printf("function called: %s\n", __func__);
+    log_info("function called: %s", __func__);
     if(state == NULL){return -1;}
 
     if(pthread_mutex_init(&state->state_lock, NULL) != 0){
@@ -31,7 +31,7 @@ int init_system_state(system_state* state){
 
 
 int destroy_system_state(system_state* state){
-    printf("function called: %s\n", __func__);
+    log_info("function called: %s", __func__);
 
     if(state == NULL){
         // nothing to do.
@@ -49,27 +49,27 @@ int destroy_system_state(system_state* state){
 
 int register_sensor(system_state* state, const char* sensor_name){
     // NOTE: this function used under the lock of its caller!
-    printf("function called: %s\n", __func__);
+    log_info("function called: %s", __func__);
     if(state == NULL){
         return -1;
     }
 
-    printf("Attempting to register sensor: %s\n", sensor_name);
+    log_info("Attempting to register sensor: %s", sensor_name);
     int idx = is_sensor_exists(state, "free");
-    printf("Returned index: %d\n", idx);
+    log_dbg("Returned index: %d", idx);
     if(idx >= 0){
         // there is space
         strcpy(state->sensors[idx].name, sensor_name);
         state->sensors[idx].name[MAX_SENSOR_NAME_LEN - 1] = '\0'; // ensure null termination
-        printf("Sensor %s registered at index %d\n", sensor_name, idx);
+        log_info("Sensor %s registered at index %d", sensor_name, idx);
         return 0;
     }
 
-    printf("No free slot found, need to realloc!\n");
+    log_info("No free slot found, need to realloc!");
     // need to realloc
     if(realloc(state->sensors, (state->num_sensors + NUM_OF_SENSORS) * sizeof(sensor)) == NULL){
         // print err:
-        fprintf(stderr, "Failed to reallocate memory for sensors\n");
+        log_err("Failed to reallocate memory for sensors");
         return -1;
     }
     strcpy(state->sensors[state->num_sensors].name, sensor_name);
@@ -77,13 +77,13 @@ int register_sensor(system_state* state, const char* sensor_name){
 
     state->num_sensors += NUM_OF_SENSORS;
 
-    printf("Sensor %s registered at index %d\n", sensor_name, (int)state->num_sensors);
+    log_info("Sensor %s registered at index %d", sensor_name, (int)state->num_sensors);
     return 0;
 }
 
 int delete_sensor(system_state* state, const char* sensor_name){
     // return the deleted idx, -1 otherwise.
-    printf("function called: %s\n", __func__);
+    log_info("function called: %s", __func__);
 
     if(!state){
         return -1;
@@ -109,29 +109,29 @@ int delete_sensor(system_state* state, const char* sensor_name){
 }
 
 int is_sensor_exists(system_state* state, const char* sensor_name){
-    printf("function called: %s\n", __func__);
+    log_info("function called: %s", __func__);
 
     // return idx of the sensor, -1 else.
     // NOTE: this function used under the lock of its caller!
     if(!state || !sensor_name){
         return -1;
     }
-    printf("arg are OK!\n");
+    log_info("args are OK!");
     size_t i = 0;
     int rc = 0;
     while((i < state->num_sensors) && ((rc = strcmp(state->sensors[i].name, sensor_name)) != 0)){
-        printf("index %d out of  %d was not a match, name was %s\n", (int)i, (int)state->num_sensors, state->sensors[i].name);
+        log_dbg("index %d out of  %d was not a match, name was %s", (int)i, (int)state->num_sensors, state->sensors[i].name);
 
         i++;
     }
-    printf("search was done, rc was %d\n", rc);
+    log_info("search was done, rc was %d", rc);
 
     return (rc == 0)? (int)i: (-1);
 }
 
 void show_sensors(system_state* state){
     // return idx of the sensor, -1 else.
-    printf("function called: %s\n", __func__);
+    log_info("function called: %s", __func__);
 
     if(!state){
         return;
@@ -140,12 +140,12 @@ void show_sensors(system_state* state){
 
 
     size_t i = 0;
-    printf("\n");
-    printf("-------------------------------------------------------\n");
-    printf("-----------------   Senors List   ---------------------\n");
-    printf("-------------------------------------------------------\n");
+    log_info("\n");
+    log_info("-------------------------------------------------------");
+    log_info("-----------------   Senors List   ---------------------");
+    log_info("-------------------------------------------------------");
     while( i < state->num_sensors && !strcmp(state->sensors[i].name, "free")){ // print only registered sensors
-        printf("Sensor [%zu/%zu] : %s", i, state->num_sensors, state->sensors[i].name);
+        log_info("Sensor [%zu/%zu] : %s", i, state->num_sensors, state->sensors[i].name);
         i++;
     }
     pthread_mutex_unlock(&state->state_lock);

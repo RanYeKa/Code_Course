@@ -2,6 +2,7 @@
 #include "network.h"
 #include "gateway.h"
 #include "sig_handling.h"
+#include "logger.h"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -14,7 +15,7 @@
 
 
 void* udp_listener_thread(void* arg){
-    printf("function called: %s\n", __func__);
+    log_info("function called: %s", __func__);
 
     care_pkg* ctx = (care_pkg*)arg;
 
@@ -23,7 +24,7 @@ void* udp_listener_thread(void* arg){
     // 1. Create the Mailbox (AF_INET = IPv4, SOCK_DGRAM = UDP)
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if(sockfd < 0){
-        printf("Socket creation Failed!\n");
+        log_err("Socket creation Failed!");
         return (void*)ctx;
     }
 
@@ -42,11 +43,11 @@ void* udp_listener_thread(void* arg){
 
     // 4. Bolt it to the door
     if (bind(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        printf("Failed to bind socket to port 8080!\n");
+        log_err("Failed to bind socket to port 8080!");
         close(sockfd);
         return (void*)ctx;
     }
-    printf("Listener bound to Port 8080. Waiting for data...\n");
+    log_info("Listener bound to Port 8080. Waiting for data...");
 
     // 5. The Main Loop
     while (g_run_flag) {
@@ -63,16 +64,16 @@ void* udp_listener_thread(void* arg){
         if (bytes_read > 0) {
             // We got a postcard! Ensure it is a valid string.
             msg.payload[bytes_read] = '\0';
-            printf("Listener caught: [%s]\n", msg.payload);
+            log_info("Listener caught: [%s]", msg.payload);
             if(rbuff_write(&ctx->rbuff, &msg) != SUCCESS){
-                printf("Failed to write to ring buffer!\n");
+                log_err("Failed to write to ring buffer!");
             }
         }
     }
 
     // 6. Graceful cleanup
     close(sockfd);
-    printf("Listener closed socket and was killed...\n");
+    log_info("Listener closed socket and was killed...");
 
     return (void*)ctx; // placeholder
 }
