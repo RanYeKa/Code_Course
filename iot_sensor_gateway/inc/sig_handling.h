@@ -15,7 +15,7 @@ extern volatile sig_atomic_t g_sig_received;
 /**
 TODO: create more handling functions:
 
-Signal  |	Logic Category  |    Suggested Callback
+Signal  |	Logic Category  |   Suggested Callback
 SIGTERM |	Graceful Exit   |	set_stop_flag
 SIGINT	|	Manual Stop     |	set_stop_flag
 SIGHUP	|	Maintenance     |	reload_config

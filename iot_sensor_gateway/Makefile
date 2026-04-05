@@ -28,7 +28,9 @@ TEST_OBJ := $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/$(TEST_DIR)/%.o,$(TEST_SRC))
 TEST_DEP := $(TEST_OBJ:.o=.d)
 
 # All production modules are linked into every test binary
-TEST_DEPS_OBJ := $(APP_OBJ)
+# TEST_DEPS_OBJ := $(APP_OBJ)
+# All production modules EXCEPT mainapp.o are linked into every test binary
+TEST_DEPS_OBJ := $(filter-out $(BUILD_DIR)/$(SRC_DIR)/mainapp.o, $(APP_OBJ))
 
 # One executable per test source
 TEST_BINS := $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/$(TEST_DIR)/%,$(TEST_SRC))

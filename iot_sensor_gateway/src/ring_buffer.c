@@ -1,6 +1,7 @@
 // ring_buffer.c
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <time.h>
 
@@ -12,8 +13,9 @@
 #define RESET "\033[0m"
 
 
-OP_STATUS init_rbuff(rbuff* rbuff, size_t size){
-    if(rbuff == NULL || size == 0){
+
+OP_STATUS init_rbuff(rbuff* rbuff, size_t size, size_t type_size){
+    if(rbuff == NULL || size == 0 || (type_size == 0)){
         return FAIL;
     }
     // init lock
@@ -25,7 +27,8 @@ OP_STATUS init_rbuff(rbuff* rbuff, size_t size){
 
     // init buffer
     rbuff->buff_size = size;
-    rbuff->buff = (sensor_msg*)malloc(size*sizeof(sensor_msg));
+    rbuff->elem_size = type_size;
+    rbuff->buff = malloc((size) * (type_size));
     if(rbuff->buff == NULL) return FAIL;
     rbuff->read_offset = 0;
     rbuff->write_offset = 0;
@@ -53,7 +56,7 @@ OP_STATUS destroy_rbuff(rbuff* rbuff){
     return SUCCESS;
 }
 
-OP_STATUS rbuff_write(rbuff* rbuff, sensor_msg* data){
+OP_STATUS rbuff_write(rbuff* rbuff, void* data){
     log_info("[DBG] Attempting to write data to ring buffer...");
     if(rbuff == NULL || rbuff->buff == NULL || data == NULL){
         return FAIL;
@@ -70,7 +73,8 @@ OP_STATUS rbuff_write(rbuff* rbuff, sensor_msg* data){
     pthread_mutex_lock(&rbuff->lock); // lock when free;
 
     // write to the correct offset.
-    memcpy((rbuff->buff + rbuff->write_offset), data, sizeof(sensor_msg));
+    uint8_t *write_offset = ((uint8_t*)rbuff->buff) + (rbuff->write_offset*rbuff->elem_size);
+    memcpy(write_offset, data, rbuff->elem_size);
     // 'offsetting'
     rbuff->write_offset = (rbuff->write_offset + 1) % rbuff->buff_size;
 
@@ -82,7 +86,7 @@ OP_STATUS rbuff_write(rbuff* rbuff, sensor_msg* data){
 
 
 
-OP_STATUS rbuff_read(rbuff* rbuff, sensor_msg* data){
+OP_STATUS rbuff_read(rbuff* rbuff, void* data){
     log_info("[DBG] Attempting to read data from ring buffer...");
     if(rbuff == NULL || rbuff->buff == NULL){
         return FAIL;
@@ -106,7 +110,8 @@ OP_STATUS rbuff_read(rbuff* rbuff, sensor_msg* data){
     pthread_mutex_lock(&rbuff->lock);
 
     // reading
-    memcpy(data, (rbuff->buff + rbuff->read_offset), sizeof(sensor_msg));
+    uint8_t *read_offset = ((uint8_t*)rbuff->buff) + (rbuff->read_offset*rbuff->elem_size);
+    memcpy(data, read_offset, rbuff->elem_size);
     // 'offsetting'
     rbuff->read_offset = (rbuff->read_offset + 1) % rbuff->buff_size;
 
@@ -121,7 +126,7 @@ bool is_empty(rbuff* rbuff){
         log_err("Ring buffer is NULL, cannot check if empty.");
         return false;
     }
-    return (rbuff->read_offset == rbuff->write_offset && rbuff->read_offset == -1);
+    return (rbuff->read_offset == rbuff->write_offset);
 }
 
 void print_messages(rbuff* rbuff){
@@ -137,17 +142,22 @@ void print_messages(rbuff* rbuff){
         return;
     }
 
-    ssize_t it = rbuff->read_offset;
+    ssize_t msg_it = rbuff->read_offset;
+    size_t hex_it = 0;
     pthread_mutex_lock(&rbuff->lock);
     do{
-        log_info("Message at [%ld] is [%s] ", it, (rbuff->buff+it)->payload);
-        if(it == rbuff->write_offset){
+        uint8_t* next_hexdump = ((uint8_t* )rbuff->buff) + (msg_it*rbuff->elem_size);
+        while(hex_it < rbuff->elem_size){
+            raw_print("%02X ", next_hexdump[hex_it]);
+            hex_it++;
+        }
+        if(msg_it == rbuff->write_offset){
             break;
         }
-        it = (it + 1) % rbuff->buff_size;
+        hex_it = 0;
+        msg_it = (msg_it + 1) % rbuff->buff_size;
     }while(1);
     pthread_mutex_unlock(&rbuff->lock);
-
 
 }
 

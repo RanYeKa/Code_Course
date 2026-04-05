@@ -84,3 +84,19 @@ void logging_backend(const char* prefix, const char* file, int line, const char*
     pthread_mutex_unlock(&logger_lock);
 }
 
+void logger_raw(const char* format, ...) {
+    pthread_mutex_lock(&logger_lock);
+
+    // Pick the log file if open, otherwise default to stdout
+    FILE* dest = (g_log_file) ? g_log_file : stdout;
+
+    va_list args;
+    va_start(args, format);
+    vfprintf(dest, format, args);
+    va_end(args);
+
+    // Optional: flush so it shows up immediately even without a \n
+    fflush(dest);
+
+    pthread_mutex_unlock(&logger_lock);
+}

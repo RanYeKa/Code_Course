@@ -3,8 +3,10 @@
 #include "gateway.h"
 #include "sig_handling.h"
 #include "logger.h"
+#include "protocol_sensor.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include <sys/socket.h> // The core socket API
@@ -17,7 +19,7 @@
 void* udp_listener_thread(void* arg){
     log_info("function called: %s", __func__);
 
-    care_pkg* ctx = (care_pkg*)arg;
+    care_pkg_t* ctx = (care_pkg_t*)arg;
 
     pthread_barrier_wait(&ctx->barrier);
 
@@ -50,24 +52,29 @@ void* udp_listener_thread(void* arg){
     log_info("Listener bound to Port 8080. Waiting for data...");
 
     // 5. The Main Loop
+    uint8_t raw_msg[sizeof(BUFF_ELEM_TYPE)];
     while (g_run_flag) {
-        sensor_msg msg;
-        memset(&msg, 0, sizeof(msg)); // Clear the buffer
+        memset(raw_msg, 0, sizeof(BUFF_ELEM_TYPE)); // Clear the buffer
 
         struct sockaddr_in client_addr; // To store who sent the postcard
         socklen_t client_len = sizeof(client_addr);
 
         // Reach into the mailbox
-        ssize_t bytes_read = recvfrom(sockfd, msg.payload, MAX_MSG_LENGTH - 1, 0,
+        ssize_t bytes_read = recvfrom(sockfd, raw_msg, sizeof(BUFF_ELEM_TYPE), 0,
                                         (struct sockaddr*)&client_addr, &client_len);
 
-        if (bytes_read > 0) {
+        if (bytes_read == sizeof(BUFF_ELEM_TYPE)) {
             // We got a postcard! Ensure it is a valid string.
-            msg.payload[bytes_read] = '\0';
-            log_info("Listener caught: [%s]", msg.payload);
-            if(rbuff_write(&ctx->rbuff, &msg) != SUCCESS){
+            log_info("Listener caught: %zd bytes from %s:%d", bytes_read,
+                    inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+            if(rbuff_write(&ctx->rbuff, raw_msg) != SUCCESS){
                 log_err("Failed to write to ring buffer!");
             }
+        }else if(bytes_read == -1){
+                log_err("recvfrom error or timeout occurred.");
+
+        }else {
+            log_warn("Received unexpected packet size: %zd bytes. Ignoring.", bytes_read);
         }
     }
 

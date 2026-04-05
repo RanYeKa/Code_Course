@@ -11,7 +11,7 @@ int SIG_ARR[] = {
     SIGILL,
     SIGABRT,
     SIGFPE,
-    SIGSEGV,
+    // SIGSEGV,
     SIGTERM
 };
 int NUM_SIG = sizeof(SIG_ARR) / sizeof(int);
@@ -19,7 +19,7 @@ cb_func_t* CB_ARR[] = { reset_flag, // SIGINT
                         reset_flag, // SIGILL
                         reset_flag, // SIGABRT
                         reset_flag, // SIGFPE
-                        reset_flag, // SIGSEGV
+                        // reset_flag, // SIGSEGV
                         reset_flag, // SIGTERM
 }; // for signal handling callback functions
 
@@ -31,7 +31,7 @@ const char* sig_num_to_str(int sig){
         case SIGILL: return "SIGILL";
         case SIGABRT: return "SIGABRT";
         case SIGFPE: return "SIGFPE";
-        case SIGSEGV: return "SIGSEGV";
+        // case SIGSEGV: return "SIGSEGV";
         case SIGTERM: return "SIGTERM";
         default: return "UNKNOWN";
     }
